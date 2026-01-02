@@ -1,0 +1,64 @@
+# Environment variables
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+env/
+venv/
+ENV/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Output files and reports
+*.csv
+*.log
+crawl_state.json
+
+# Generated content directories
+llms_content/
+
+# Generated llms.txt (this is a large generated file, not source)
+llms.txt
+
+# Test/temp files
+test*.py
+1.txt
+2.txt
+
+# HTML exports
+specs*.html
+
+# Other project files not needed for repo
+analyzeseo*.py
+generatecorpus*.py
+seo_audit_README.md
+llms_txt_README.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Git
+.git/
