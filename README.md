@@ -13,7 +13,7 @@ A Python-based SEO auditing tool that analyzes websites for **Generative Engine 
 - **Deep Crawling**: Supports multi-page website analysis with configurable depth
 - **CSV Export**: Generates detailed reports for tracking progress over time
 
-## Why This Matters in 2025
+## Why This Matters
 
 AI search engines (ChatGPT, Perplexity, Claude, Google AI Overviews, Gemini) are changing how content is discovered. This tool helps optimize for:
 - Direct answer citations in AI responses

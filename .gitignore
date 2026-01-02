@@ -34,8 +34,7 @@ llms.txt
 
 # Test/temp files
 test*.py
-1.txt
-2.txt
+*.txt
 
 # HTML exports
 specs*.html
@@ -46,6 +45,7 @@ generatecorpus*.py
 seo_audit_README.md
 llms_txt_README.md
 publish_to_github.md
+reindex.py
 
 # OS files
 .DS_Store
