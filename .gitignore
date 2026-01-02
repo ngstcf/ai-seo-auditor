@@ -45,6 +45,7 @@ analyzeseo*.py
 generatecorpus*.py
 seo_audit_README.md
 llms_txt_README.md
+publish_to_github.md
 
 # OS files
 .DS_Store

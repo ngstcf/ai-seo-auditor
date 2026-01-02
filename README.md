@@ -127,4 +127,4 @@ Contributions are welcome! Feel free to open issues or submit pull requests.
 
 ## Author
 
-Created by [@ngstcf](https://github.com/ngstcf)
+Created by Ng Chong [@ngstcf](https://github.com/ngstcf)
