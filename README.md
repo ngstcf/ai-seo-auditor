@@ -21,7 +21,7 @@ AI search engines (ChatGPT, Perplexity, Claude, Google AI Overviews, Gemini) are
 - Clear, scannable content formats
 - Authority signals that build trust
 
-> **Reference:** For more on SEO in the AI era, see [SEO for the AI Era: A 2025 Quick Guide](https://c3.unu.edu/blog/seo-for-the-ai-era-a-2025-quick-guide) by United Nations University.
+> **Reference:** For more on SEO in the AI era, see article [SEO for the AI Era: A 2025 Quick Guide](https://c3.unu.edu/blog/seo-for-the-ai-era-a-2025-quick-guide)
 
 ## Installation
 
