@@ -2,6 +2,8 @@
 
 A Python-based SEO auditing tool that analyzes websites for **Generative Engine Optimization (GEO)** and **Answer Engine Optimization (AEO)** — optimizing for AI search visibility in 2025/2026.
 
+> **Reference:** For more on SEO in the AI era, see article [SEO for the AI Era: A 2025 Quick Guide](https://c3.unu.edu/blog/seo-for-the-ai-era-a-2025-quick-guide)
+
 ## Features
 
 The auditor evaluates your site across **11 scored categories** with programmatic checks feeding into an LLM-powered analysis:
@@ -36,8 +38,6 @@ AI search engines (ChatGPT, Perplexity, Claude, Google AI Overviews, Gemini, Cop
 - 85% of AI-cited content is from the last 2 years
 - Question-format headings increase citation likelihood by 40%
 - Statistics with cited sources improve AI visibility by 40%
-
-> **Reference:** For more on SEO in the AI era, see article [SEO for the AI Era: A 2025 Quick Guide](https://c3.unu.edu/blog/seo-for-the-ai-era-a-2025-quick-guide)
 
 ## Installation
 
