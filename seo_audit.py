@@ -1184,19 +1184,42 @@ def save_html_report(reports: List[Dict], domain_context: Optional[Dict] = None,
                 page_recs_html += f'<br><span style="font-size:12px;color:#6b7280;margin-left:60px">Impact: {rec["impact"]}</span>'
             page_recs_html += '</div>'
 
+        recs_by_category = {}
+        for rec in page.get('recommendations', []):
+            cat = rec.get('category', '')
+            recs_by_category.setdefault(cat, []).append(rec)
+
         detail_metrics_html = ""
         for m in page.get('metrics', []):
             ms = m.get('score', 'N/A')
+            cat = m.get('category', '')
+            status = m.get('status', '')
             bar_width = ms if isinstance(ms, (int, float)) else 0
             bar_color = _score_color(bar_width) if isinstance(ms, (int, float)) else "#d1d5db"
+            details_text = m.get('details', '')
+            details_html = f'<div style="font-size:12px;color:#6b7280;margin:4px 0 2px 0;line-height:1.4">{details_text}</div>' if details_text else ''
+            cat_recs = recs_by_category.get(cat, []) if status in ('Warning', 'Fail') else []
+            remediation_html = ''
+            if cat_recs:
+                rem_parts = []
+                for r in cat_recs[:3]:
+                    impact_html = f'<br><span style="color:#6b7280;font-size:11px;margin-left:4px">Impact: {r["impact"]}</span>' if r.get("impact") else ''
+                    rem_parts.append(f'<li style="font-size:12px;color:#374151;margin-bottom:3px">{_priority_badge(r.get("priority",""))} {r.get("action","")}{impact_html}</li>')
+                rem_items = ''.join(rem_parts)
+                label = "Remediation" if status == 'Fail' else "Suggested Fixes"
+                remediation_html = f'<div style="margin:4px 0 2px 0"><span style="font-size:11px;font-weight:600;color:{bar_color};text-transform:uppercase">{label}</span><ul style="margin:4px 0 0 0;padding-left:18px">{rem_items}</ul></div>'
             detail_metrics_html += f'''
-            <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f3f4f6">
-                <div style="width:160px;font-size:13px;color:#374151">{m.get('category','')}</div>
-                <div style="flex:1;background:#f3f4f6;border-radius:4px;height:20px;overflow:hidden">
-                    <div style="width:{bar_width}%;height:100%;background:{bar_color};border-radius:4px;transition:width 0.3s"></div>
+            <div style="padding:8px 0;border-bottom:1px solid #f3f4f6">
+                <div style="display:flex;align-items:center;gap:8px">
+                    <div style="width:160px;font-size:13px;color:#374151">{cat}</div>
+                    <div style="flex:1;background:#f3f4f6;border-radius:4px;height:20px;overflow:hidden">
+                        <div style="width:{bar_width}%;height:100%;background:{bar_color};border-radius:4px;transition:width 0.3s"></div>
+                    </div>
+                    <div style="width:35px;text-align:right;font-weight:600;color:{bar_color};font-size:13px">{ms}</div>
+                    {_status_badge(status)}
                 </div>
-                <div style="width:35px;text-align:right;font-weight:600;color:{bar_color};font-size:13px">{ms}</div>
-                {_status_badge(m.get('status',''))}
+                {details_html}
+                {remediation_html}
             </div>'''
 
         pages_rows += f'''
