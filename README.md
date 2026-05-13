@@ -22,8 +22,9 @@ The auditor evaluates your site across **11 scored categories** with programmati
 - **Semantic Clarity**: Evaluates topic focus, context richness, and entity mentions
 
 ### Additional Features
-- **Anti-Bot Bypass**: Stealth mode, magic mode, user simulation, navigator override, and auto-retry (up to 3 attempts) for sites with bot protection
-- **Deep Crawling**: Multi-page analysis with configurable depth via BFS strategy
+- **Anti-Bot Bypass**: Stealth mode, magic mode, user simulation, and navigator override for sites with bot protection. When the headless browser is blocked (empty JS shell), the tool automatically falls back to plain HTTP fetching — extracting content, links, and metadata from the server-rendered HTML
+- **Deep Crawling**: Multi-page analysis with configurable depth via BFS strategy. If the browser is blocked on the first page, the tool discovers internal links from the HTTP-fetched homepage and crawls additional pages directly, up to `MAX_PAGES`
+- **HTML Dashboard**: Interactive browser-based report with score gauges, color-coded metric cards, expandable per-page details, and a prioritized action plan
 - **CSV Export**: Detailed reports with all 11 metric scores for historical tracking
 
 ## Why This Matters
@@ -46,19 +47,32 @@ AI search engines (ChatGPT, Perplexity, Claude, Google AI Overviews, Gemini, Cop
    cd ai-seo-auditor
    ```
 
-2. Install dependencies:
+2. Create and activate a virtual environment:
+   ```bash
+   python -m venv env
+   source env/bin/activate   # macOS/Linux
+   env\Scripts\activate      # Windows
+   ```
+
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Install crawl4ai browser setup:
+4. Install crawl4ai browser setup:
    ```bash
    crawl4ai-setup
    ```
 
+5. Set up your environment file:
+   ```bash
+   cp .env.example .env
+   ```
+   Then edit `.env` and add your API key.
+
 ## Configuration
 
-Create a `.env` file in the project root:
+Edit the `.env` file in the project root:
 
 ```env
 # Required: OpenAI-compatible API key
@@ -70,12 +84,12 @@ LLM_BASE_URL=https://api.openai.com/v1
 # Optional: Model to use (defaults to gpt-4o-mini)
 LLM_MODEL=gpt-4o-mini
 
-# Optional: Crawl depth and page limits
+# Crawl depth: 0 = landing page only, 1 = landing page + links on it, 2+ = deeper
 MAX_DEPTH=1
+
+# Maximum number of pages to analyze per audit
 MAX_PAGES=5
 ```
-
-A `.env.example` file is provided for reference.
 
 ## Usage
 
@@ -89,13 +103,14 @@ Follow the prompts to enter a URL. The tool will:
 2. Crawl the specified page(s) with anti-bot bypass enabled
 3. Run programmatic extraction on each page (schema, meta tags, freshness, headings, links, E-E-A-T, content quality)
 4. Send all pre-analyzed data to the LLM for scoring across 11 categories
-5. Print a detailed report and save results to `ai_seo_report_2025.csv`
+5. Print a detailed console report, save CSV to `ai_seo_report_2025.csv`, and generate an HTML dashboard at `ai_seo_report.html`
 
 ## Output
 
-The tool generates:
+The tool generates three outputs:
 - **Console Report**: Domain-level summary + per-page analysis with 11 scored categories, strengths, and prioritized recommendations
-- **CSV Report**: All metrics in columns for historical tracking and comparison
+- **HTML Dashboard** (`ai_seo_report.html`): Self-contained, browser-viewable report with score gauges, color-coded metric cards, expandable page details, and a prioritized action plan
+- **CSV Report** (`ai_seo_report_2025.csv`): All metrics in columns for historical tracking and comparison
 
 ### Score Categories
 
@@ -133,7 +148,7 @@ The tool generates:
 - [ ] **Multi-language Support**: Extend LLM prompts and content analysis for non-English sites
 - [ ] **Historical Tracking**: Built-in comparison of previous audits to show progress over time
 - [ ] **Competitor Analysis**: Compare multiple sites side-by-side
-- [ ] **Export Formats**: Add JSON and HTML report options
+- [ ] **JSON Export**: Add JSON report option alongside existing HTML and CSV
 - [ ] **CI/CD Integration**: GitHub Action for automated SEO checks on PRs
 - [ ] **Batch Mode**: Analyze multiple URLs from a file without interactive prompts
 - [ ] **Core Web Vitals**: Integrate page speed and UX metrics from Lighthouse/PageSpeed Insights

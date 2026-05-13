@@ -299,6 +299,48 @@ def extract_structured_content(html: str) -> Dict[str, Any]:
         "has_structured_content": list_count > 0 or table_count > 0 or has_faq or definition_list_count > 0
     }
 
+def html_to_markdown_simple(html: str) -> str:
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, 'html.parser')
+    for tag in soup.find_all(['script', 'style', 'nav', 'footer', 'header', 'noscript']):
+        tag.decompose()
+    lines = []
+    for el in soup.find_all(['h1','h2','h3','h4','h5','h6','p','li','td','th','blockquote','pre']):
+        text = el.get_text(' ', strip=True)
+        if not text:
+            continue
+        if el.name.startswith('h'):
+            level = int(el.name[1])
+            lines.append(f"\n{'#' * level} {text}\n")
+        elif el.name == 'li':
+            lines.append(f"- {text}")
+        elif el.name == 'blockquote':
+            lines.append(f"> {text}")
+        else:
+            lines.append(text)
+    return '\n\n'.join(lines)
+
+
+def extract_links_from_html(html: str, page_url: str) -> Dict[str, List[Dict]]:
+    from bs4 import BeautifulSoup
+    from urllib.parse import urlparse, urljoin
+    soup = BeautifulSoup(html, 'html.parser')
+    parsed_page = urlparse(page_url)
+    page_domain = parsed_page.netloc
+    internal, external = [], []
+    for a in soup.find_all('a', href=True):
+        href = a['href']
+        full_url = urljoin(page_url, href)
+        text = a.get_text(strip=True)
+        parsed_link = urlparse(full_url)
+        entry = {"href": full_url, "text": text, "base_domain": parsed_link.netloc}
+        if parsed_link.netloc == page_domain:
+            internal.append(entry)
+        elif parsed_link.scheme in ('http', 'https'):
+            external.append(entry)
+    return {"internal": internal, "external": external}
+
+
 def extract_meta_tags(html: str, metadata: Optional[dict] = None) -> Dict[str, Any]:
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(html, 'html.parser') if html else None
@@ -1033,6 +1075,262 @@ def save_to_csv(reports: List[Dict], filename="ai_seo_report_2025.csv"):
 
     print(f"\n💾 Saved {len(reports)} detailed reports to '{filename}'")
 
+
+def save_html_report(reports: List[Dict], domain_context: Optional[Dict] = None,
+                     filename: str = "ai_seo_report.html"):
+    from urllib.parse import urlparse
+
+    scores = [r.get('overall_score', 0) for r in reports if isinstance(r.get('overall_score'), (int, float))]
+    avg_score = round(sum(scores) / len(scores), 1) if scores else 0
+
+    all_recs = []
+    for r in reports:
+        page_url = r.get('url', '')
+        for rec in r.get('recommendations', []):
+            all_recs.append({**rec, 'page_url': page_url})
+
+    critical_recs = [r for r in all_recs if r.get('priority') == 'Critical']
+    high_recs = [r for r in all_recs if r.get('priority') == 'High']
+    medium_recs = [r for r in all_recs if r.get('priority') == 'Medium']
+    low_recs = [r for r in all_recs if r.get('priority') == 'Low']
+
+    category_avgs = {}
+    for r in reports:
+        for m in r.get('metrics', []):
+            cat = m.get('category', '')
+            score = m.get('score')
+            if isinstance(score, (int, float)):
+                category_avgs.setdefault(cat, []).append(score)
+    category_avgs = {k: round(sum(v) / len(v), 1) for k, v in category_avgs.items()}
+
+    def _score_color(s):
+        if s >= 70: return "#22c55e"
+        if s >= 40: return "#eab308"
+        return "#ef4444"
+
+    def _score_bg(s):
+        if s >= 70: return "#f0fdf4"
+        if s >= 40: return "#fefce8"
+        return "#fef2f2"
+
+    def _status_badge(status):
+        colors = {"Pass": ("#166534", "#dcfce7"), "Warning": ("#854d0e", "#fef9c3"), "Fail": ("#991b1b", "#fee2e2")}
+        fg, bg = colors.get(status, ("#374151", "#f3f4f6"))
+        return f'<span style="background:{bg};color:{fg};padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600">{status}</span>'
+
+    def _priority_badge(priority):
+        colors = {"Critical": ("#991b1b", "#fee2e2"), "High": ("#854d0e", "#fef9c3"),
+                  "Medium": ("#1e40af", "#dbeafe"), "Low": ("#374151", "#f3f4f6")}
+        fg, bg = colors.get(priority, ("#374151", "#f3f4f6"))
+        return f'<span style="background:{bg};color:{fg};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">{priority}</span>'
+
+    domain_name = ""
+    if reports:
+        first_url = reports[0].get('url', '')
+        parsed = urlparse(first_url)
+        domain_name = parsed.netloc
+
+    metric_cards_html = ""
+    for cat, avg in category_avgs.items():
+        color = _score_color(avg)
+        bg = _score_bg(avg)
+        metric_cards_html += f'''
+        <div style="background:{bg};border:1px solid {color}33;border-radius:12px;padding:16px;text-align:center;min-width:140px">
+            <div style="font-size:28px;font-weight:700;color:{color}">{avg}</div>
+            <div style="font-size:12px;color:#6b7280;margin-top:4px">{cat}</div>
+        </div>'''
+
+    domain_html = ""
+    if domain_context:
+        items = [
+            ("Robots.txt", domain_context.get('robots_summary', 'N/A')),
+            ("llms.txt", domain_context.get('llms_txt', 'N/A')),
+            ("Sitemap", domain_context.get('sitemap_summary', 'N/A')),
+            ("AI Discovery", domain_context.get('ai_files_summary', 'N/A')),
+        ]
+        domain_html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px">'
+        for label, value in items:
+            is_good = value in ("Present",) or ("0 of" in str(value) and "blocked" in str(value))
+            icon = "✅" if is_good else "⚠️"
+            domain_html += f'<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px"><span style="font-size:13px;color:#6b7280">{label}</span><br><span style="font-size:14px;font-weight:500">{icon} {value}</span></div>'
+        domain_html += '</div>'
+
+    pages_rows = ""
+    for i, page in enumerate(reports, 1):
+        score = page.get('overall_score', 0)
+        color = _score_color(score)
+        readiness = page.get('ai_readiness', 'Unknown')
+        title = page.get('title', 'Untitled')[:60]
+        url = page.get('url', '')
+
+        metrics_cells = ""
+        for m in page.get('metrics', []):
+            ms = m.get('score', 'N/A')
+            if isinstance(ms, (int, float)):
+                mc = _score_color(ms)
+                metrics_cells += f'<td style="text-align:center"><span style="color:{mc};font-weight:600">{ms}</span></td>'
+            else:
+                metrics_cells += f'<td style="text-align:center;color:#9ca3af">{ms}</td>'
+
+        strengths_html = ""
+        for s in page.get('strengths', [])[:3]:
+            strengths_html += f'<li style="font-size:13px;color:#374151">{s}</li>'
+
+        page_recs_html = ""
+        page_recs = page.get('recommendations', [])
+        for rec in page_recs[:5]:
+            page_recs_html += f'<div style="padding:6px 0;border-bottom:1px solid #f3f4f6">{_priority_badge(rec.get("priority",""))} <span style="font-size:13px">{rec.get("action","")}</span>'
+            if rec.get('impact'):
+                page_recs_html += f'<br><span style="font-size:12px;color:#6b7280;margin-left:60px">Impact: {rec["impact"]}</span>'
+            page_recs_html += '</div>'
+
+        detail_metrics_html = ""
+        for m in page.get('metrics', []):
+            ms = m.get('score', 'N/A')
+            bar_width = ms if isinstance(ms, (int, float)) else 0
+            bar_color = _score_color(bar_width) if isinstance(ms, (int, float)) else "#d1d5db"
+            detail_metrics_html += f'''
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f3f4f6">
+                <div style="width:160px;font-size:13px;color:#374151">{m.get('category','')}</div>
+                <div style="flex:1;background:#f3f4f6;border-radius:4px;height:20px;overflow:hidden">
+                    <div style="width:{bar_width}%;height:100%;background:{bar_color};border-radius:4px;transition:width 0.3s"></div>
+                </div>
+                <div style="width:35px;text-align:right;font-weight:600;color:{bar_color};font-size:13px">{ms}</div>
+                {_status_badge(m.get('status',''))}
+            </div>'''
+
+        pages_rows += f'''
+        <div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:16px" id="page-{i}">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <div>
+                    <h3 style="margin:0;font-size:16px;color:#111827">{title}</h3>
+                    <a href="{url}" style="font-size:13px;color:#6b7280;text-decoration:none" target="_blank">{url}</a>
+                </div>
+                <div style="text-align:center">
+                    <div style="font-size:36px;font-weight:700;color:{color}">{score}</div>
+                    <div style="font-size:12px;color:#6b7280">{readiness}</div>
+                </div>
+            </div>
+            <details style="margin-top:8px">
+                <summary style="cursor:pointer;font-weight:600;font-size:14px;color:#4b5563;padding:8px 0">Show detailed metrics & recommendations</summary>
+                <div style="margin-top:12px">
+                    <h4 style="margin:12px 0 8px;font-size:14px;color:#374151">Metric Breakdown</h4>
+                    {detail_metrics_html}
+                    <div style="display:flex;gap:24px;margin-top:16px">
+                        <div style="flex:1">
+                            <h4 style="margin:0 0 8px;font-size:14px;color:#374151">Strengths</h4>
+                            <ul style="margin:0;padding-left:20px">{strengths_html or '<li style="color:#9ca3af">None identified</li>'}</ul>
+                        </div>
+                        <div style="flex:2">
+                            <h4 style="margin:0 0 8px;font-size:14px;color:#374151">Recommendations</h4>
+                            {page_recs_html or '<div style="color:#9ca3af;font-size:13px">No recommendations</div>'}
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </div>'''
+
+    action_plan_html = ""
+    for priority, recs, color_cls in [("Critical", critical_recs, "#fee2e2"),
+                                       ("High", high_recs, "#fef9c3"),
+                                       ("Medium", medium_recs, "#dbeafe"),
+                                       ("Low", low_recs, "#f3f4f6")]:
+        if not recs:
+            continue
+        action_plan_html += f'<h3 style="margin:16px 0 8px;font-size:15px">{_priority_badge(priority)} {len(recs)} {priority} Issues</h3>'
+        for rec in recs[:15]:
+            short_url = urlparse(rec.get('page_url', '')).path or '/'
+            action_plan_html += f'''
+            <div style="background:{color_cls};border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:13px">
+                <strong>{rec.get('action','')}</strong>
+                <span style="color:#6b7280;margin-left:8px">{rec.get('category','')}</span>
+                <span style="color:#9ca3af;margin-left:8px;font-size:12px">{short_url}</span>
+                {f'<br><span style="color:#6b7280;font-size:12px">Impact: {rec["impact"]}</span>' if rec.get('impact') else ''}
+            </div>'''
+
+    gauge_pct = avg_score / 100
+    gauge_dash = 251.2 * gauge_pct
+    gauge_color = _score_color(avg_score)
+
+    html = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI SEO Audit Report - {domain_name}</title>
+<style>
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f9fafb; color: #111827; line-height: 1.5; }}
+  .container {{ max-width: 1100px; margin: 0 auto; padding: 24px; }}
+  h1 {{ font-size: 24px; font-weight: 700; }}
+  h2 {{ font-size: 18px; font-weight: 600; margin: 24px 0 12px; color: #374151; }}
+  a {{ color: #2563eb; }}
+  details > summary {{ list-style: none; }}
+  details > summary::-webkit-details-marker {{ display: none; }}
+  details > summary::before {{ content: "\\25B6 "; font-size: 10px; transition: transform 0.2s; display: inline-block; margin-right: 4px; }}
+  details[open] > summary::before {{ transform: rotate(90deg); }}
+  @media print {{
+    details {{ open: true; }}
+    details > summary {{ display: none; }}
+    .no-print {{ display: none; }}
+  }}
+  @media (max-width: 768px) {{
+    .metric-grid {{ grid-template-columns: repeat(2, 1fr) !important; }}
+  }}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:16px">
+    <div>
+        <h1>AI SEO Audit Report</h1>
+        <p style="color:#6b7280;font-size:14px">{domain_name} &middot; {time.strftime("%B %d, %Y at %H:%M")} &middot; {len(reports)} page{"s" if len(reports) != 1 else ""} analyzed</p>
+    </div>
+    <div style="text-align:center">
+        <svg width="100" height="100" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" stroke-width="8"/>
+            <circle cx="50" cy="50" r="40" fill="none" stroke="{gauge_color}" stroke-width="8"
+                    stroke-dasharray="{gauge_dash} 251.2" stroke-dashoffset="0"
+                    transform="rotate(-90 50 50)" stroke-linecap="round"/>
+            <text x="50" y="46" text-anchor="middle" font-size="22" font-weight="700" fill="{gauge_color}">{avg_score}</text>
+            <text x="50" y="62" text-anchor="middle" font-size="10" fill="#6b7280">avg score</text>
+        </svg>
+    </div>
+</div>
+
+<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:24px">
+    <h2 style="margin:0 0 12px">Domain-Level Checks</h2>
+    {domain_html or '<p style="color:#9ca3af">No domain context available</p>'}
+</div>
+
+<h2>Category Averages</h2>
+<div class="metric-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px">
+    {metric_cards_html}
+</div>
+
+<h2>Page Analysis</h2>
+{pages_rows}
+
+<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-top:24px">
+    <h2 style="margin:0 0 8px">Action Plan ({len(all_recs)} total issues)</h2>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:12px">Prioritized recommendations across all pages. Address Critical items first.</p>
+    {action_plan_html or '<p style="color:#22c55e;font-weight:500">No issues found!</p>'}
+</div>
+
+<div style="text-align:center;padding:24px;color:#9ca3af;font-size:12px">
+    Generated by AI SEO Auditor v2.0.0 &middot; GEO/AEO Optimization Tool | UNU Campus Computing Centre
+</div>
+
+</div>
+</body>
+</html>'''
+
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.write(html)
+    print(f"🌐 HTML report saved to '{filename}' — open in browser to view")
+
+
 # --- 4. Main Crawler Logic ---
 async def analyze_site(start_url: str):
     """Enhanced crawler with 2025 AI SEO checks"""
@@ -1072,7 +1370,7 @@ async def analyze_site(start_url: str):
         magic=True,
         simulate_user=True,
         override_navigator=True,
-        max_retries=3,
+        max_retries=0,
         deep_crawl_strategy=deep_strategy,
     )
 
@@ -1093,21 +1391,89 @@ async def analyze_site(start_url: str):
     ai_files_data = check_ai_discovery_files(base_url)
     print(f"   📄 AI discovery: {ai_files_data['summary']}")
 
+    import requests as _req
+    _http_headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'}
+
+    def _is_empty_shell(html):
+        if not html:
+            return True
+        stripped = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
+        stripped = re.sub(r'<style[^>]*>.*?</style>', '', stripped, flags=re.DOTALL | re.IGNORECASE)
+        stripped = re.sub(r'<[^>]+>', '', stripped).strip()
+        return len(stripped) < 100
+
+    def _http_fallback(url):
+        try:
+            resp = _req.get(url, timeout=15, headers=_http_headers)
+            if resp.status_code == 200 and len(resp.text) > 500:
+                return resp.text
+        except Exception:
+            pass
+        return None
+
     async with AsyncWebCrawler(config=browser_config) as crawler:
         results = await crawler.arun(url=start_url, config=run_config)
 
         if not isinstance(results, list):
             results = [results]
 
+        # If BFS was starved (browser blocked on first page), discover links via HTTP
+        # and fetch additional pages manually
+        if len(results) <= 1 and max_pages > 1:
+            first_res = results[0] if results else None
+            first_html = None
+            if first_res and _is_empty_shell(first_res.html):
+                first_html = _http_fallback(first_res.url)
+            if first_html:
+                first_res.html = first_html
+                first_res.success = True
+                first_res._markdown = None
+                first_res._fallback_markdown = html_to_markdown_simple(first_html)
+                first_res._fallback_links = extract_links_from_html(first_html, first_res.url)
+                discovered = first_res._fallback_links.get('internal', [])
+                seen_urls = {first_res.url.rstrip('/')}
+                extra_urls = []
+                for link in discovered:
+                    href = link.get('href', '').split('#')[0].split('?')[0].rstrip('/')
+                    if href and href not in seen_urls and href.startswith(base_url):
+                        seen_urls.add(href)
+                        extra_urls.append(href)
+                        if len(extra_urls) >= max_pages - 1:
+                            break
+
+                if extra_urls:
+                    print(f"\n🔄 Browser was blocked — fetching {len(extra_urls)} additional pages via HTTP...")
+                    from crawl4ai.models import CrawlResult
+                    for extra_url in extra_urls:
+                        html = _http_fallback(extra_url)
+                        if html and not _is_empty_shell(html):
+                            fake_res = CrawlResult(url=extra_url, html=html, success=True)
+                            fake_res._fallback_markdown = html_to_markdown_simple(html)
+                            fake_res._fallback_links = extract_links_from_html(html, extra_url)
+                            results.append(fake_res)
+
         print(f"\n✅ Crawl Complete: {len(results)} pages fetched")
         aggregated_report = []
 
         for idx, res in enumerate(results, 1):
-            if not res.success:
-                print(f"⚠️  [{idx}] Error: {res.url} - {res.error_message}")
-                continue
+            needs_fallback = not res.success or _is_empty_shell(res.html)
 
-            print(f"\n🔎 [{idx}/{len(results)}] Analyzing: {res.url}")
+            if needs_fallback:
+                print(f"\n🔎 [{idx}/{len(results)}] Analyzing: {res.url}")
+                print(f"   ⚠️  Browser blocked, falling back to HTTP fetch...")
+                fallback_html = _http_fallback(res.url)
+                if fallback_html:
+                    res.html = fallback_html
+                    res.success = True
+                    res._markdown = None
+                    res._fallback_markdown = html_to_markdown_simple(fallback_html)
+                    res._fallback_links = extract_links_from_html(fallback_html, res.url)
+                    print(f"   ✅ HTTP fallback succeeded ({len(fallback_html):,} bytes)")
+                else:
+                    print(f"   ❌ HTTP fallback failed, skipping page")
+                    continue
+            else:
+                print(f"\n🔎 [{idx}/{len(results)}] Analyzing: {res.url}")
 
             # Extract schema
             schema_data = extract_schema_tags(res.html)
@@ -1118,9 +1484,10 @@ async def analyze_site(start_url: str):
             structured_content = extract_structured_content(res.html)
             print(f"   📊 Structure: Lists={structured_content['list_count']}, Tables={structured_content['table_count']}, FAQ={structured_content['has_faq']}")
 
-            # Page-level checks
+            # Use fallback-generated data when available, otherwise crawl4ai data
             crawl_metadata = res.metadata if hasattr(res, 'metadata') else None
-            crawl_links = res.links if hasattr(res, 'links') else None
+            crawl_links = getattr(res, '_fallback_links', None) or (res.links if hasattr(res, 'links') else None)
+            page_markdown = getattr(res, '_fallback_markdown', None) or res.markdown
 
             meta_tags = extract_meta_tags(res.html, metadata=crawl_metadata)
             print(f"   🏷️  Meta: {meta_tags['summary']}")
@@ -1137,13 +1504,13 @@ async def analyze_site(start_url: str):
             eeat_signals = extract_eeat_signals(res.html, metadata=crawl_metadata, schema_data=schema_data)
             print(f"   👤 E-E-A-T: {eeat_signals['summary']}")
 
-            content_quality = analyze_content_quality(res.markdown)
+            content_quality = analyze_content_quality(page_markdown)
             print(f"   📝 Quality: {content_quality['summary']}")
 
             # Send to LLM
             print(f"   🧠 Analyzing with AI...")
             json_str = await analyze_content_with_llm(
-                res.markdown,
+                page_markdown,
                 schema_data,
                 structured_content,
                 llms_txt_status,
@@ -1256,6 +1623,7 @@ async def main():
     if reports:
         print_detailed_report(reports, domain_context=domain_context)
         save_to_csv(reports)
+        save_html_report(reports, domain_context=domain_context)
 
         critical_issues = sum(
             1 for r in reports
@@ -1267,7 +1635,8 @@ async def main():
         print(f"📈 SUMMARY")
         print(f"{'='*80}")
         print(f"🔴 Critical Issues: {critical_issues}")
-        print(f"💾 Full report saved to: ai_seo_report_2025.csv")
+        print(f"💾 CSV report saved to: ai_seo_report_2025.csv")
+        print(f"🌐 HTML dashboard saved to: ai_seo_report.html")
         print(f"\n🎯 Next Steps:")
         print(f"   1. Address Critical priority items first")
         print(f"   2. Unblock AI crawlers in robots.txt if blocked")

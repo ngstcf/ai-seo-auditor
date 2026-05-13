@@ -37,7 +37,7 @@ test*.py
 *.txt
 
 # HTML exports
-specs*.html
+*.html
 
 # Other project files not needed for repo
 analyzeseo*.py
