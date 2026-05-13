@@ -4,6 +4,14 @@ A Python-based SEO auditing tool that analyzes websites for **Generative Engine 
 
 > **Reference:** For more on SEO in the AI era, see article [SEO for the AI Era: A 2025 Quick Guide](https://c3.unu.edu/blog/seo-for-the-ai-era-a-2025-quick-guide)
 
+## What's New in v2.0.0
+
+- **11 audit categories** (up from 5): added Robots.txt AI Access, OpenGraph & Meta, Content Freshness, Heading Structure, Link Profile, and Content Quality
+- **9 new programmatic checks** run before the LLM scores — schema dates/authors, meta tags, heading hierarchy, link analysis, E-E-A-T signals, content quality metrics, sitemap validation, and AI discovery files
+- **Anti-bot bypass with HTTP fallback**: when the headless browser is blocked, the tool automatically falls back to plain HTTP fetching
+- **Deep crawl recovery**: if the browser can't render the first page, internal links are discovered from HTTP-fetched HTML and additional pages are crawled directly
+- **HTML dashboard report**: interactive browser-based report with score gauges, per-metric explanations, inline remediation steps for Warning/Fail metrics, and a prioritized action plan
+
 ## Features
 
 The auditor evaluates your site across **11 scored categories** with programmatic checks feeding into an LLM-powered analysis:
@@ -26,7 +34,7 @@ The auditor evaluates your site across **11 scored categories** with programmati
 ### Additional Features
 - **Anti-Bot Bypass**: Stealth mode, magic mode, user simulation, and navigator override for sites with bot protection. When the headless browser is blocked (empty JS shell), the tool automatically falls back to plain HTTP fetching — extracting content, links, and metadata from the server-rendered HTML
 - **Deep Crawling**: Multi-page analysis with configurable depth via BFS strategy. If the browser is blocked on the first page, the tool discovers internal links from the HTTP-fetched homepage and crawls additional pages directly, up to `MAX_PAGES`
-- **HTML Dashboard**: Interactive browser-based report with score gauges, color-coded metric cards, expandable per-page details, and a prioritized action plan
+- **HTML Dashboard**: Interactive browser-based report with score gauges, color-coded metric cards, expandable per-page details with inline explanations and remediation steps for Warning/Fail metrics, and a prioritized action plan
 - **CSV Export**: Detailed reports with all 11 metric scores for historical tracking
 
 ## Why This Matters
@@ -109,7 +117,7 @@ Follow the prompts to enter a URL. The tool will:
 
 The tool generates three outputs:
 - **Console Report**: Domain-level summary + per-page analysis with 11 scored categories, strengths, and prioritized recommendations
-- **HTML Dashboard** (`ai_seo_report.html`): Self-contained, browser-viewable report with score gauges, color-coded metric cards, expandable page details, and a prioritized action plan
+- **HTML Dashboard** (`ai_seo_report.html`): Self-contained, browser-viewable report with score gauges, color-coded metric cards, expandable page details with per-metric explanations and remediation steps, and a prioritized action plan
 - **CSV Report** (`ai_seo_report_2025.csv`): All metrics in columns for historical tracking and comparison
 
 ### Score Categories
